@@ -6,10 +6,10 @@ clone_folder: c:\gopath\src\github.com\%APPVEYOR_REPO_NAME%
 init:
   - go version
   - go env
-  - ps: Invoke-RestMethod -Method Get -Uri "https://releases.hashicorp.com/terraform/$($env:TERRAFORMVERSION)/terraform_$($env:TERRAFORMVERSION)_windows_amd64.zip" -OutFile "c:/terraform_windows_amd64.zip"
-  - ps: Expand-Archive -Path "c:/terraform_windows_amd64.zip" -Destination "C:/Tools/terraform"
+  - pwsh: Invoke-RestMethod -Method Get -Uri "https://releases.hashicorp.com/terraform/$($env:TERRAFORMVERSION)/terraform_$($env:TERRAFORMVERSION)_windows_amd64.zip" -OutFile "c:/terraform_windows_amd64.zip"
+  - pwsh: Expand-Archive -Path "c:/terraform_windows_amd64.zip" -Destination "C:/Tools/terraform"
   - mkdir "C:/Tools/logparser"
-  - ps: Invoke-WebRequest -Method Get -Uri "https://github.com/gruntwork-io/terratest/releases/download/$($env:LOGPARSERVERSION)/terratest_log_parser_windows_amd64.exe" -OutFile "C:/Tools/logparser/terratest_log_parser.exe"
+  - pwsh: Invoke-WebRequest -Method Get -Uri "https://github.com/gruntwork-io/terratest/releases/download/$($env:LOGPARSERVERSION)/terratest_log_parser_windows_amd64.exe" -OutFile "C:/Tools/logparser/terratest_log_parser.exe"
   - set PATH=%PATH%;C:\Tools\terraform\;C:\Tools\logparser\
 install:
   - choco install dep
@@ -32,16 +32,16 @@ for:
         - configuration: Unit Tests
     test_script:
       - mkdir logs
-      - ps: go test -v -parallel 1 $(go list ./... | where-object { $_ -notlike "*/test" }) | Tee-Object -FilePath 'logs/unit.log'
-      - ps: terratest_log_parser.exe --testlog logs/unit.log --outputdir ./logs/unit/
+      - pwsh: go test -v -parallel 1 $(go list ./... | where-object { $_ -notlike "*/test" }) | Tee-Object -FilePath 'logs/unit.log'
+      - pwsh: terratest_log_parser.exe --testlog logs/unit.log --outputdir ./logs/unit/
   -
     matrix:
       only:
         - configuration: Integration Tests
     test_script:
       - mkdir logs
-      - ps: go test -v $(go list ./... | where-object { $_ -like "*/test" }) | Tee-Object -FilePath 'logs/integration.log'
-      - ps: terratest_log_parser.exe --testlog logs/integration.log --outputdir ./logs/integration/
+      - pwsh: go test -v $(go list ./... | where-object { $_ -like "*/test" }) | Tee-Object -FilePath 'logs/integration.log'
+      - pwsh: terratest_log_parser.exe --testlog logs/integration.log --outputdir ./logs/integration/
 artifacts:
   - path: logs
     name: test_logs
