@@ -1,4 +1,7 @@
 version: 1.0.{build}
+configuration:
+  - Unit Tests
+  - Integration Tests
 clone_folder: c:\gopath\src\github.com\%APPVEYOR_REPO_NAME%
 init:
   - go version
@@ -21,10 +24,25 @@ build_script:
   - dep ensure
 test_script:
   - mkdir logs
-  - pwsh: go test -v -parallel 1 $(go list ./... | where-object { $_ -notlike "*/test" }) | Tee-Object -FilePath 'logs/unit.log'
-  - terratest_log_parser.exe --testlog logs/unit.log --outputdir ./logs/unit/
-  - pwsh: go test -v $(go list ./... | where-object { $_ -like "*/test" }) | Tee-Object -FilePath 'logs/integration.log'
-  - terratest_log_parser.exe --testlog logs/integration.log --outputdir ./logs/integration/
+for:
+  -
+    matrix:
+      only:
+        - configuration: Unit Tests
+      test_script:
+        - pwsh: go test -v -parallel 1 $(go list ./... | where-object { $_ -notlike "*/test" }) | Tee-Object -FilePath 'logs/unit.log'
+        - pwsh: $exitcode = $LastExitCode
+        - pwsh: terratest_log_parser.exe --testlog logs/unit.log --outputdir ./logs/unit/
+        - pwsh: if ($exitcode -ne 0) { $host.SetShouldExit($LastExitCode) }
+  -
+    matrix:
+      only:
+        - configuration: Integration Tests
+      test_script:
+        - pwsh: go test -v $(go list ./... | where-object { $_ -like "*/test" }) | Tee-Object -FilePath 'logs/integration.log'
+        - pwsh: $exitcode = $LastExitCode
+        - pwsh: terratest_log_parser.exe --testlog logs/integration.log --outputdir ./logs/integration/
+        - pwsh: if ($exitcode -ne 0) { $host.SetShouldExit($LastExitCode) }
 artifacts:
   - path: logs
     name: test_logs
