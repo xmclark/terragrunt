@@ -21,10 +21,6 @@ environment:
   TERRAFORMVERSION: 0.11.13
 build_script:
   - dep ensure
-matrix:
-  allow_failures:
-    - configuration: Unit Tests
-    - configuration: Integration Tests
 for:
   -
     matrix:
