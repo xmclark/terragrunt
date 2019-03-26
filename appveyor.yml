@@ -1,7 +1,4 @@
 version: 1.0.{build}
-configuration:
-  - Unit Tests
-  - Integration Tests
 clone_folder: c:\gopath\src\github.com\%APPVEYOR_REPO_NAME%
 init:
   - go version
@@ -18,7 +15,8 @@ environment:
   GOTESTTIMEOUT: 45m
   LOGPARSERVERSION: v0.13.8
   TERRAGRUNT_DOWNLOAD: C:\.terragrunt-cache
-  TERRAFORMVERSION: 0.11.13
+matrix:
+  - TERRAFORMVERSION: 0.11.13
 build_script:
   - dep ensure
 test_script:
