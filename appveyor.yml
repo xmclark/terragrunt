@@ -15,8 +15,8 @@ environment:
   GOTESTTIMEOUT: 45m
   LOGPARSERVERSION: v0.13.8
   TERRAGRUNT_DOWNLOAD: C:\.terragrunt-cache
-matrix:
-  - TERRAFORMVERSION: 0.11.13
+  matrix:
+    - TERRAFORMVERSION: 0.11.13
 build_script:
   - dep ensure
 test_script:
