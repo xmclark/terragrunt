@@ -21,32 +21,25 @@ environment:
   TERRAFORMVERSION: 0.11.13
 build_script:
   - dep ensure
-for:
-  -
-    matrix:
-      only:
-        - configuration: Unit Tests
-    test_script:
-      - mkdir logs
-      - pwsh: go test -v -parallel 1 $(go list ./... | where-object { $_ -notlike "*/test" }) | Tee-Object -FilePath 'logs/unit.log'
-      - pwsh: $host.SetShouldExit($LastExitCode)
-    on_finish:
-      - pwsh: terratest_log_parser.exe --testlog logs/unit.log --outputdir ./logs/unit/
-      - pwsh: $wc = New-Object 'System.Net.WebClient'
-      - pwsh: $wc.UploadFile("https://ci.appveyor.com/api/testresults/junit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path ./logs/unit/report.xml))
-  -
-    matrix:
-      only:
-        - configuration: Integration Tests
-    test_script:
-      - mkdir logs
-      - pwsh: go test -v $(go list ./... | where-object { $_ -like "*/test" }) | Tee-Object -FilePath 'logs/integration.log'
-      - pwsh: $host.SetShouldExit($LastExitCode)
-    on_finish:
-      - pwsh: terratest_log_parser.exe --testlog logs/integration.log --outputdir ./logs/integration/
-      - pwsh: $wc = New-Object 'System.Net.WebClient'
-      - pwsh: $wc.UploadFile("https://ci.appveyor.com/api/testresults/junit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path ./logs/integration/report.xml))
+test_script:
+  - mkdir logs
+  - pwsh: |
+      if ($env:CONFIGURATION -eq "Unit Tests") {
+        go test -v -parallel 1 $(go list ./... | where-object { $_ -notlike "*/test" }) | Tee-Object -FilePath 'logs/unit.log'
+        terratest_log_parser.exe --testlog logs/unit.log --outputdir ./logs/unit/
+      } ElseIf ($env:CONFIGURATION -eq "Integration Tests") {
+        go test -v $(go list ./... | where-object { $_ -like "*/test" }) | Tee-Object -FilePath 'logs/integration.log'
+        terratest_log_parser.exe --testlog logs/integration.log --outputdir ./logs/integration/
+      }
 artifacts:
   - path: logs
     name: test_logs
 deploy: off
+on_finish:
+  - ps: $wc = New-Object 'System.Net.WebClient'
+  - ps: |
+      if ($env:CONFIGURATION -eq "Unit Tests") {
+        $wc.UploadFile("https://ci.appveyor.com/api/testresults/junit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path ./logs/unit/report.xml))
+      } ElseIf ($env:CONFIGURATION -eq "Integration Tests") {
+        $wc.UploadFile("https://ci.appveyor.com/api/testresults/junit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path ./logs/integration/report.xml))
+      }
