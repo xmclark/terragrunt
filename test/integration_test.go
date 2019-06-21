@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -431,6 +432,19 @@ func TestTerragruntWorksWithIncludes(t *testing.T) {
 	tmpTerragruntConfigPath := createTmpTerragruntConfigWithParentAndChild(t, TEST_FIXTURE_INCLUDE_PATH, TEST_FIXTURE_INCLUDE_CHILD_REL_PATH, s3BucketName, config.DefaultTerragruntConfigPath, config.DefaultTerragruntConfigPath)
 
 	runTerragrunt(t, fmt.Sprintf("terragrunt apply --terragrunt-non-interactive --terragrunt-config %s --terragrunt-working-dir %s", tmpTerragruntConfigPath, childPath))
+
+	// Get the output to verify directory interpolations
+	stdoutBuffer := bytes.NewBufferString("")
+	stderrBuffer := bytes.NewBufferString("")
+	command := fmt.Sprintf("terragrunt output --terragrunt-non-interactive --terragrunt-config %s --terragrunt-working-dir %s", tmpTerragruntConfigPath, childPath)
+	runTerragruntRedirectOutput(t, command, stdoutBuffer, stderrBuffer)
+	output := stdoutBuffer.String()
+
+	expectedTgDir := filepath.Dir(tmpTerragruntConfigPath)
+	assert.True(t, strings.Contains(output, fmt.Sprintf("terragrunt_dir = %s\n", expectedTgDir)), "terragrunt_dir was not expected path %s", expectedTgDir)
+
+	expectedParentTgDir := filepath.Clean(filepath.Join(expectedTgDir, "..", ".."))
+	assert.True(t, strings.Contains(output, fmt.Sprintf("parent_terragrunt_dir = %s\n", expectedParentTgDir)), "parent_terragrunt_dir was not expected path %s", expectedParentTgDir)
 }
 
 func TestTerragruntReportsTerraformErrorsWithPlanAll(t *testing.T) {
@@ -1493,6 +1507,13 @@ func runTerragruntCommand(t *testing.T, command string, writer io.Writer, errwri
 
 func runTerragrunt(t *testing.T, command string) {
 	runTerragruntRedirectOutput(t, command, os.Stdout, os.Stderr)
+}
+
+func runTerragruntAndGetOutput(t *testing.T, command string) (string, string) {
+	stdoutBuffer := bytes.NewBufferString("")
+	stderrBuffer := bytes.NewBufferString("")
+	runTerragruntRedirectOutput(t, command, stdoutBuffer, stderrBuffer)
+	return stdoutBuffer.String(), stderrBuffer.String()
 }
 
 func runTerragruntRedirectOutput(t *testing.T, command string, writer io.Writer, errwriter io.Writer) {
