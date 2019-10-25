@@ -604,7 +604,7 @@ func providersNeedInit(terragruntOptions *options.TerragruntOptions) bool {
 // If terraformSource is specified, then arguments to download the terraform source will be appended to the init command.
 //
 // This method will return an error and NOT run terraform init if the user has disabled Auto-Init
-func runTerraformInit(terragruntOptions *options.TerragruntOptions, terragruntConfig *config.TerragruntConfig, terraformSource *TerraformSource) error {
+func runTerraformInit(terragruntOptions *options.TerragruntOptions, terragruntConfig *config.TerragruntConfig, terraformSource *config.TerraformSource) error {
 
 	// Prevent Auto-Init if the user has disabled it
 	if util.FirstArg(terragruntOptions.TerraformCliArgs) != CMD_INIT && !terragruntOptions.AutoInit {
@@ -620,7 +620,7 @@ func runTerraformInit(terragruntOptions *options.TerragruntOptions, terragruntCo
 	return runTerragruntWithConfig(initOptions, terragruntConfig, terraformSource != nil)
 }
 
-func prepareInitOptions(terragruntOptions *options.TerragruntOptions, terraformSource *TerraformSource) (*options.TerragruntOptions, error) {
+func prepareInitOptions(terragruntOptions *options.TerragruntOptions, terraformSource *config.TerraformSource) (*options.TerragruntOptions, error) {
 	// Need to clone the terragruntOptions, so the TerraformCliArgs can be configured to run the init command
 	initOptions := terragruntOptions.Clone(terragruntOptions.TerragruntConfigPath)
 	initOptions.TerraformCliArgs = []string{CMD_INIT}
