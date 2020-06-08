@@ -2346,6 +2346,27 @@ func TestDependencyOutputCachePathBug(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestVarTypeAnyRegression(t *testing.T) {
+	t.Parallel()
+
+	rawModulePath := filepath.Join(TEST_FIXTURE_REGRESSIONS, "typeany")
+	cleanupTerraformFolder(t, rawModulePath)
+	tmpEnvPath := copyEnvironment(t, rawModulePath)
+	rootPath := filepath.Join(tmpEnvPath, rawModulePath)
+
+	stdout := bytes.Buffer{}
+	stderr := bytes.Buffer{}
+	err := runTerragruntCommand(
+		t,
+		fmt.Sprintf("terragrunt apply --terragrunt-non-interactive --terragrunt-working-dir %s", rootPath),
+		&stdout,
+		&stderr,
+	)
+	logBufferContentsLineByLine(t, stdout, "stdout")
+	logBufferContentsLineByLine(t, stderr, "stderr")
+	require.NoError(t, err)
+}
+
 func TestDependencyOutputWithTerragruntSource(t *testing.T) {
 	t.Parallel()
 
