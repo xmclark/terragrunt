@@ -1,112 +1,55 @@
-defaults: &defaults
-  docker:
-    - image: 087285199408.dkr.ecr.us-east-1.amazonaws.com/circle-ci-test-image-base:tf13
+version: 2.1
 
-version: 2
+orbs:
+  win: circleci/windows@2.2.0
+  golang: cci-orb/golang@0.1.17
+
 jobs:
-  # We're running unit tests separately from integration tests - with no parallelization.
-  # With heavy parallelization coupled with re-use of test fixtures we've witnessed slight
-  # instability with the tests. The unit tests are fast to execute, so there is negligible
-  # performance penalty.
-  unit_test:
-    <<: *defaults
+  unit_test_windows:
+    executor:
+      name: win/default
+#      name: golang/windows
+    environment:
+      LOGPARSERVERSION: "v0.30.23"
+      TERRAFORMVERSION: "0.13.5"
     steps:
       - checkout
-      - run: gruntwork-install --binary-name 'terratest_log_parser' --repo 'https://github.com/gruntwork-io/terratest' --tag 'v0.30.0'
-      # Run pre-commit hooks and fail the build if any hook finds required changes.
-      - run:
-          name: run precommit
-          command: |
-            # Oct 26, 2019: Install the last known working version of pre-commit. Also, we have to pin the version of
-            # transitive dependencies that are being pulled in which released new versions that are no longer compatible
-            # with any python < 3.6.
-            pip3 install pre-commit==1.21.0 cfgv==2.0.1 zipp==1.1.0
-            pre-commit install
-            pre-commit run --all-files
-      - run:
-          command: |
-            mkdir -p logs
-            run-go-tests --parallelism 1 --packages "$(go list ./... | grep -v /test | tr '\n' ' ')"  | tee logs/unit.log
-      - run:
-          command: terratest_log_parser --testlog logs/unit.log --outputdir logs
+      - restore_cache:
+          keys:
+            - v4-cache-{{ .Branch }}-{{ checksum "go.sum" }}
+      - run: go version
+      - run: go env
+      - run: |
+          # https://discuss.circleci.com/t/access-denied-error-while-trying-to-download-software-on-windows-cirlcleci-environment/32809/3
+          $ProgressPreference = "SilentlyContinue"
+          Invoke-RestMethod -Method Get -Uri "https://releases.hashicorp.com/terraform/$($env:TERRAFORMVERSION)/terraform_$($env:TERRAFORMVERSION)_windows_amd64.zip" -OutFile "c:/terraform_windows_amd64.zip"
+          $ProgressPreference = "Continue"
+      - run: Expand-Archive -Path "c:/terraform_windows_amd64.zip" -Destination "C:/Tools/terraform"
+      - run: mkdir "C:/Tools/logparser"
+      - run: |
+          # https://discuss.circleci.com/t/access-denied-error-while-trying-to-download-software-on-windows-cirlcleci-environment/32809/3
+          $ProgressPreference = "SilentlyContinue"
+          Invoke-WebRequest -Method Get -Uri "https://github.com/gruntwork-io/terratest/releases/download/$($env:LOGPARSERVERSION)/terratest_log_parser_windows_amd64.exe" -OutFile "C:/Tools/logparser/terratest_log_parser.exe"
+          $ProgressPreference = "Continue"
+      - run: $env:PATH="$env:PATH;C:\Tools\terraform\;C:\Tools\logparser\"
+      - run: |
+          go version
+          C:\Tools\terraform\terraform.exe version
+      - run: |
+          go get
+      - run: |
+          $env:PATH="$env:PATH;C:\Tools\terraform\;C:\Tools\logparser\"
+          go get
+      - run: |
+          $env:PATH="$env:PATH;C:\Tools\terraform\;C:\Tools\logparser\"
+          go test ./cli
+      - save_cache:
           when: always
-      - store_artifacts:
-          path: logs
-      - store_test_results:
-          path: logs
-
-  integration_test:
-    <<: *defaults
-    steps:
-      - checkout
-      - run: gruntwork-install --binary-name 'terratest_log_parser' --repo 'https://github.com/gruntwork-io/terratest' --tag 'v0.30.0'
-      # Make GCP Service Account creds available as a file
-      - run: echo $GCLOUD_SERVICE_KEY > ${HOME}/gcloud-service-key.json
-      - run: echo 'export GOOGLE_APPLICATION_CREDENTIALS=${HOME}/gcloud-service-key.json' >> $BASH_ENV
-      # Import test / dev key for SOPS
-      - run:
-          command: |
-            gpg --import --no-tty --batch --yes ./test/fixture-sops/test_pgp_key.asc
-            mkdir -p logs
-            run-go-tests --packages "$(go list ./... | grep /test | tr '\n' ' ')" | tee logs/integration.log
-      - run:
-          command: terratest_log_parser --testlog logs/integration.log --outputdir logs
-          when: always
-      - store_artifacts:
-          path: logs
-      - store_test_results:
-          path: logs
-
-  build:
-    <<: *defaults
-    steps:
-      - checkout
-      - run: build-go-binaries --app-name terragrunt --dest-path bin --ld-flags "-X main.VERSION=$CIRCLE_TAG"
-
-  deploy:
-    <<: *defaults
-    steps:
-      - checkout
-      - run: build-go-binaries --app-name terragrunt --dest-path bin --ld-flags "-X main.VERSION=$CIRCLE_TAG"
-      - run: cd bin && sha256sum * > SHA256SUMS
-      - run: upload-github-release-assets bin/*
-
+          key: v4-cache-{{ .Branch }}-{{ checksum "go.sum" }}
+          paths:
+            - $GOPATH/pkg/mod
 workflows:
   version: 2
   build-and-test:
     jobs:
-      - unit_test:
-          filters:
-            tags:
-              only: /^v.*/
-      - integration_test:
-          filters:
-            tags:
-              only: /^v.*/
-      - build:
-          requires:
-            - unit_test
-            - integration_test
-          filters:
-            tags:
-              only: /^v.*/
-
-      - deploy:
-          requires:
-            - build
-          filters:
-            tags:
-              only: /^v.*/
-            branches:
-              ignore: /.*/
-
-  nightly:
-    triggers:
-      - schedule:
-          cron: "0 6 * * *"
-          filters:
-            branches:
-              only: master
-    jobs:
-      - unit_test
-      - integration_test
+      - unit_test_windows
